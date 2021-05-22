@@ -18,3 +18,5 @@ Route::get('/', function () {
 });
 
 Route::post('/orders','OrdersController@placeOrder');
+Route::patch('/orders/{id}','OrdersController@takeOrder');
+Route::get('/orders','OrdersController@listOrders');
