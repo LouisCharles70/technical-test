@@ -1,64 +1,53 @@
-version: '3.7'
+version: "3.7"
 services:
-  #PHP Service
-  app:
+  lalamove-app:
     build:
-      context: .
+      args:
+        user: www
+        uid: 1000
+      context: ./
       dockerfile: Dockerfile
-    image: digitalocean.com/php
-    container_name: app
+    image: laravel-image
+    container_name: lalamove-app
     restart: unless-stopped
-    tty: true
-    env_file:
-      - .env
-    environment:
-      MYSQL_DATABASE: ${DB_DATABASE}
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      SERVICE_NAME: app
-      SERVICE_TAGS: dev
-    working_dir: /var/www
+    working_dir: /var/www/
     volumes:
       - ./:/var/www
       - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
-      - app-network
-  #Nginx Service
-  webserver:
-    image: nginx:alpine
-    container_name: webserver
+      - lalamove-network
+
+  lalamove-database:
+    image: mysql:5.7
+    container_name: lalamove-database
     restart: unless-stopped
-    tty: true
     ports:
-      - "80:80"
-      - "443:443"
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - ./mysql/my.cnf:/etc/mysql/my.cnf
+      - ./mysql/docker-entrypoint-initdb.d/:/docker-entrypoint-initdb.d/
+    networks:
+      - lalamove-network
+
+  lalamove-webserver:
+    image: nginx:alpine
+    container_name: lalamove-webserver
+    restart: unless-stopped
+    ports:
+      - 8080:80
     volumes:
       - ./:/var/www
       - ./nginx/conf.d/:/etc/nginx/conf.d/
     networks:
-      - app-network
+      - lalamove-network
 
-  #MySQL Service
-  db:
-    image: mysql:5.7.22
-    container_name: db
-    restart: unless-stopped
-    tty: true
-    ports:
-      - "3308:3306"
-    environment:
-      MYSQL_DATABASE: ${DB_DATABASE}
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - dbdata:/var/lib/mysql/
-      - ./mysql/my.cnf:/etc/mysql/my.cnf
-    networks:
-      - app-network
-
-#Docker Networks
 networks:
-  app-network:
+  lalamove-network:
     driver: bridge
-#Volumes
-volumes:
-  dbdata:
-    driver: local
