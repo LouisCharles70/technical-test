@@ -33,6 +33,8 @@ services:
     volumes:
       - ./mysql/my.cnf:/etc/mysql/my.cnf
       - ./mysql/docker-entrypoint-initdb.d/:/docker-entrypoint-initdb.d/
+      - dbdata:/var/lib/mysql/
+
     networks:
       - lalamove-network
 
@@ -51,3 +53,8 @@ services:
 networks:
   lalamove-network:
     driver: bridge
+
+#Volumes
+volumes:
+  dbdata:
+    driver: local

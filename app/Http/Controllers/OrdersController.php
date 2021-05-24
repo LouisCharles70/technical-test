@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\CustomHelpers;
+use App\Logistic;
 use App\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 
@@ -19,7 +21,6 @@ class OrdersController extends Controller
     public function placeOrder(Request $request){
 //        Validation rules
 
-//        TODO: Need to fix the validation rule around latitude|longitude
         // Origin and destination must be array of exactly two strings
         $arrayValidationRule = "required|array|min:2|max:2";
 
@@ -33,23 +34,41 @@ class OrdersController extends Controller
         $validator = Validator::make($request->all(),[
             "origin"            => $arrayValidationRule,
             "destination"       => $arrayValidationRule,
-            'origin[0]'         => $latitudeValidationRule,
-            'origin[1]'         => $longitudeValidationRule,
-            'destination[0]'    => $latitudeValidationRule,
-            'destination[1]'    => $longitudeValidationRule
+            "origin.*"          => "string",
+            "destination.*"     => "string"
         ]);
 
-        $validationErrors = $validator->errors()->messages();
-        if(count($validationErrors)>0)
-            return CustomHelpers::returnValidationErrors();
+        $latitudeRule = "/^[-]?(([0-8]?[0-9])\.(\d+))|(90(\.0+)?)$/";
+        $longitudeRule = "/^[-]?((((1[0-7][0-9])|([0-9]?[0-9]))\.(\d+))|180(\.0+)?)$/";
+
+
+        if(!preg_match($latitudeRule,request('origin')[0]))
+            $validator->errors()->add("Origin latitude ","Origin latitude incorrect");
+
+        if(!preg_match($latitudeRule,request('destination')[0]))
+            $validator->errors()->add("Destination latitude ","Destination latitude incorrect");
+
+        if(!preg_match($longitudeRule,request('origin')[1]))
+            $validator->errors()->add("Origin longitude ","Origin longitude incorrect");
+
+        if(!preg_match($longitudeRule,request('destination')[1]))
+            $validator->errors()->add("Destination longitude ","Destination longitude incorrect");
+
+        if(count($validator->messages())>0)
+            return CustomHelpers::returnValidationErrors($validator);
+
+        try {
+            $distance = Logistic::computeDistance(request('origin'), request('destination'));
+        } catch (\Exception $e) {
+            return response()->json([
+                "message" => $e->getMessage()
+            ],500);
+        }
 
         $order = new Order();
-        $order->orderPlaced(
-            request('origin'),
-            request('destination')
-        );
+        $order->orderPlaced($distance);
 
-        return response([
+        return response()->json([
             "id" => $order->id,
             "distance" => $order->distance,
             "status" => "UNASSIGNED"
@@ -71,6 +90,7 @@ class OrdersController extends Controller
         if(request('status')=='TAKEN')
             $order->orderTaken();
 
+
         return response()->json([
             "status" => "Order successfully taken"
         ]);
@@ -79,22 +99,21 @@ class OrdersController extends Controller
     //    QUERY STRING PARAMETERS
     //    page, limit
     public function listOrders(Request $request){
-        $validationRule = "integer|min:1";
+        $validationRule = "required|integer|min:1";
 
         $validator = Validator::make($request->all(),[
             "page"      => $validationRule,
             "limit"     => $validationRule
         ]);
 
+        if(count($validator->messages())>0)
+            return CustomHelpers::returnValidationErrors($validator);
 
-        $validationErrors = $validator->errors()->messages();
-        if(count($validationErrors)>0)
-            return CustomHelpers::returnValidationErrors();
-
-
-        return response()->json(Order::returnFormattedOrders(
+        $orders = Order::returnFormattedOrders(
             request('page'),
             request('limit')
-        ));
+        );
+
+        return response()->json($orders);
     }
 }

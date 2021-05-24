@@ -1,11 +1,11 @@
-<?php // Code within app\Helpers\Helper.php
+<?php
 
 namespace App;
 
 class CustomHelpers{
 
 
-    public static function returnValidationErrors(){
-        return strtoupper($string);
+    public static function returnValidationErrors($validator){
+        return response()->json($validator->messages(),"400");
     }
 }

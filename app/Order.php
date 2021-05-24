@@ -3,6 +3,7 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Order extends Model
 {
@@ -13,23 +14,31 @@ class Order extends Model
         $this->end_latitude = $endCoordinates[0];
         $this->end_longitude = $endCoordinates[0];
         $this->distance = Logistic::computeDistance($startCoordinates,$endCoordinates);
+
+        if(!is_int($this->distance))
+            return response()->json([
+                "message" => $this->distance
+            ],500);
+
         $this->save();
     }
 
     public function orderTaken(){
-        $this->status = "TAKEN";
-        $this->save();
+        DB::table("orders")
+            ->where('status','=','UNASSIGNED')
+            ->where('id','=',$this->id)
+            ->update([
+                "status" => "TAKEN"
+            ]);
     }
 
     public static function returnFormattedOrders(int $page,int $limit){
-        dd(Order::paginate($limit, ['*'], 'page', $page));
-
         return array_map(function($order){
             return [
-                "id" => $order->id,
-                "distance" => $order->distance,
-                "status" => $order->status
+                "id" => $order["id"],
+                "distance" => $order["distance"],
+                "status" => $order["status"]
             ];
-        }, Order::paginate($limit, ['*'], 'page', $page)->get());
+        }, Order::take($limit)->skip(($page-1)*$limit)->get()->toArray());
     }
 }
