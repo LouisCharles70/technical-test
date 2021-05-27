@@ -15,12 +15,6 @@ class CreateOrdersTable extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
-            $table->string('start_latitude');
-            $table->string('start_longitude');
-
-            $table->string('end_latitude');
-            $table->string('end_longitude');
-
             $table->integer('distance');
 
             $table->enum('status',['UNASSIGNED','TAKEN','SUCCESS'])->default("UNASSIGNED");

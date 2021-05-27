@@ -4,10 +4,8 @@ namespace Tests\Unit;
 
 use App\Order;
 use Illuminate\Support\Facades\DB;
-use Mockery;
 use Tests\TestCase;
 use Faker;
-use yidas\googleMaps\Client;
 
 class UnitTest extends TestCase
 {
@@ -22,10 +20,7 @@ class UnitTest extends TestCase
     public function placeOrder(){
         $faker = Faker\Factory::create();
 
-//        $spy = spy(Client::class);
-        $double = $this->getMockClass("Client");
-
-        // Test 10 random latitude, longitude
+        // Happy scenarios: Test 10 random latitude, longitude
         for($test=0;$test<10;$test++){
             $origin = [
                 "$faker->latitude",
@@ -36,31 +31,29 @@ class UnitTest extends TestCase
                 "$faker->longitude"
             ];
 
+//            TODO: MOCK GOOGLE CLOUD FUNCTION API
             $response = $this
                 ->post(env('APP_URL').'/orders',[
                     "origin" => $origin,
                     "destination" => $destination
                 ]);
 
-//            $double->method("directions")->with("$origin[0],$origin[1]", "$destination[0],$destination[1]", [
-//                    'mode' => "transit",
-//                    'departure_time' => time(),
-//                ]
-//            );
-
-//            Google Directions API can not always compute the distance between two points
+//            Google Directions API can not always compute the distance between two points as the random latitude
+//            longitude are often located in the sea, in these cases the distance can not be computed by Google
+//            Directions API
             if($response->status()!=200)
                 echo $response->content() . "\n";
 
 //            Case where Google Directions API can compute the distance
-            if(json_decode($response->content())->message!=="Unable to compute distance between origin and destination"){
+            if(!isset(json_decode($response->getContent())->message)){
                 $response->assertStatus(200);
 
+                $decodedResponse = json_decode($response->getContent());
+
                 $this->assertDatabaseHas("orders",[
-                    "start_latitude" => $origin[0],
-                    "start_longitude" => $origin[1],
-                    "end_latitude" => $destination[0],
-                    "end_longitude" => $destination[1]
+                    "id" => $decodedResponse->id,
+                    "distance" => $decodedResponse->distance,
+                    "status" => "UNASSIGNED"
                 ]);
             }
         }
@@ -143,15 +136,12 @@ class UnitTest extends TestCase
             ->where('status','=','UNASSIGNED')
             ->pluck("id");
 
-        //        Successful orders
+//        Happy scenarios: Successful orders taken
         foreach($freeOrdersIds as $randomOrderId){
             $response = $this
                 ->patch('/orders/'.$randomOrderId,[
                     "status" => "TAKEN"
                 ]);
-            if($response->status()==500)
-                dd($randomOrderId,$response->content());
-
             $response->assertStatus(200);
 
             $this->assertDatabaseHas("orders",[
@@ -160,7 +150,7 @@ class UnitTest extends TestCase
             ]);
         }
 
-        //      Orders already taken
+//        Orders already taken
         $takenOrders = Order::inRandomOrder()
             ->limit(10)
             ->where('status','=','TAKEN')
@@ -171,11 +161,21 @@ class UnitTest extends TestCase
                 ->patch('/orders/'.$orderId,[
                     "status" => "TAKEN"
                 ]);
-            if($response->status()==200)
-                dd($orderId);
-
             $response->assertStatus(500);
         }
+
+        //        Order doesn't exist
+        $nonExistingOrderId = DB::table("orders")
+            ->orderBy("id","desc")
+            ->first()
+            ->id+1;
+
+        $response = $this
+            ->patch('/orders/'.$nonExistingOrderId,[
+                "status" => "TAKEN"
+            ]);
+        $response->assertStatus(500);
+
     }
 
     /** @test */
@@ -189,18 +189,14 @@ class UnitTest extends TestCase
 
             $response = $this
                 ->get("/orders/?page=$randomPageNumber&limit=$randomLimit");
+
+            if($randomLimit==0 or $randomPageNumber==0){
+                $response->assertStatus(400);
+                continue;
+            }
+
             $response->assertStatus(200);
         }
-
-        //        Test with Page 0
-        $response = $this
-            ->get('/orders/?page=0&limit=1');
-        $response->assertStatus(400);
-
-        //        Test with Limit 0
-        $response = $this
-            ->get('/orders/?page=1&limit=0');
-        $response->assertStatus(400);
 
         $ordersCount = DB::table("orders")->count()+1;
         //        Test with 0 result

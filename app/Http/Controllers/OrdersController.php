@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\CustomHelpers;
 use App\Logistic;
 use App\Order;
+use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 
@@ -19,17 +19,10 @@ class OrdersController extends Controller
     //      "destination": ["END_LATITUDE", "END_LONGITUDE"]
     //  }
     public function placeOrder(Request $request){
-//        Validation rules
+        //        Validation rules
 
-        // Origin and destination must be array of exactly two strings
+        //        Origin and destination must be array of exactly two strings
         $arrayValidationRule = "required|array|min:2|max:2";
-
-        // Validation rule for latitude: float between -90 and +90
-        $latitudeValidationRule = ["string","/^[-]?(([0-8]?[0-9])\.(\d+))|(90(\.0+)?)$/"];
-
-        // Validation rule for longitude: float between -180 and +180
-        $longitudeValidationRule = ["string","/^[-]?((((1[0-7][0-9])|([0-9]?[0-9]))\.(\d+))|180(\.0+)?)$/"];
-
 
         $validator = Validator::make($request->all(),[
             "origin"            => $arrayValidationRule,
@@ -38,33 +31,38 @@ class OrdersController extends Controller
             "destination.*"     => "string"
         ]);
 
+        //        Latitude/Longitude validation rules
         $latitudeRule = "/^[-]?(([0-8]?[0-9])\.(\d+))|(90(\.0+)?)$/";
         $longitudeRule = "/^[-]?((((1[0-7][0-9])|([0-9]?[0-9]))\.(\d+))|180(\.0+)?)$/";
 
 
-        if(!preg_match($latitudeRule,request('origin')[0]))
+        if(isset(request('origin')[0]) && !preg_match($latitudeRule,request('origin')[0]))
             $validator->errors()->add("Origin latitude ","Origin latitude incorrect");
 
-        if(!preg_match($latitudeRule,request('destination')[0]))
+        if(isset(request('destination')[0]) && !preg_match($latitudeRule,request('destination')[0]))
             $validator->errors()->add("Destination latitude ","Destination latitude incorrect");
 
-        if(!preg_match($longitudeRule,request('origin')[1]))
+        if(isset(request('origin')[1]) && !preg_match($longitudeRule,request('origin')[1]))
             $validator->errors()->add("Origin longitude ","Origin longitude incorrect");
 
-        if(!preg_match($longitudeRule,request('destination')[1]))
+        if(isset(request('destination')[1]) && !preg_match($longitudeRule,request('destination')[1]))
             $validator->errors()->add("Destination longitude ","Destination longitude incorrect");
 
+
+        //        If validation errors have been detected, throw 400 bad request response
         if(count($validator->messages())>0)
             return CustomHelpers::returnValidationErrors($validator);
 
+        //        Check the distance has been successfully computed from the Google Maps Direction API
         try {
             $distance = Logistic::computeDistance(request('origin'), request('destination'));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 "message" => $e->getMessage()
             ],500);
         }
 
+        //        Store new order's distance inside the database
         $order = new Order();
         $order->orderPlaced($distance);
 
@@ -80,13 +78,22 @@ class OrdersController extends Controller
     //      "status": "TAKEN"
     //  }
     public function takeOrder(){
+        //        Fetch taken order
         $order = Order::find(request('id'));
 
+        //        If order not found, throw error
+        if(is_null($order))
+            return response()->json([
+                "error" => "Order not found in the database..."
+            ],500);
+
+        //        If the error has already been taken, throw error
         if($order->status=="TAKEN")
             return response()->json([
                 "error" => "Order already taken"
             ],500);
 
+        //        Update the database
         if(request('status')=='TAKEN')
             $order->orderTaken();
 
@@ -106,6 +113,7 @@ class OrdersController extends Controller
             "limit"     => $validationRule
         ]);
 
+        //        If validation errors have been detected, throw 400 bad request response
         if(count($validator->messages())>0)
             return CustomHelpers::returnValidationErrors($validator);
 

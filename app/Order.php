@@ -2,24 +2,34 @@
 
 namespace App;
 
+use Eloquent;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * App\Order
+ *
+ * @property int $id
+ * @property int $distance
+ * @property string $status
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @method static Builder|Order newModelQuery()
+ * @method static Builder|Order newQuery()
+ * @method static Builder|Order query()
+ * @method static Builder|Order whereCreatedAt($value)
+ * @method static Builder|Order whereDistance($value)
+ * @method static Builder|Order whereId($value)
+ * @method static Builder|Order whereStatus($value)
+ * @method static Builder|Order whereUpdatedAt($value)
+ * @mixin Eloquent
+ */
 class Order extends Model
 {
-    public function orderPlaced(array $startCoordinates,array $endCoordinates){
-        $this->start_latitude = $startCoordinates[0];
-        $this->start_longitude = $startCoordinates[0];
-
-        $this->end_latitude = $endCoordinates[0];
-        $this->end_longitude = $endCoordinates[0];
-        $this->distance = Logistic::computeDistance($startCoordinates,$endCoordinates);
-
-        if(!is_int($this->distance))
-            return response()->json([
-                "message" => $this->distance
-            ],500);
-
+    public function orderPlaced(int $distance){
+        $this->distance = $distance;
         $this->save();
     }
 
@@ -33,12 +43,12 @@ class Order extends Model
     }
 
     public static function returnFormattedOrders(int $page,int $limit){
-        return array_map(function($order){
-            return [
-                "id" => $order["id"],
-                "distance" => $order["distance"],
-                "status" => $order["status"]
-            ];
-        }, Order::take($limit)->skip(($page-1)*$limit)->get()->toArray());
+        return Order::take($limit)
+            ->skip(($page-1)*$limit)
+            ->select([
+                "id",
+                "distance",
+                "status"
+            ])->get();
     }
 }

@@ -2,9 +2,19 @@
 
 namespace App;
 
+use Eloquent;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use yidas\googleMaps\Client;
 
+/**
+ * App\Logistic
+ *
+ * @method static Builder|Logistic newModelQuery()
+ * @method static Builder|Logistic newQuery()
+ * @method static Builder|Logistic query()
+ * @mixin Eloquent
+ */
 class Logistic extends Model
 {
     public static function computeDistance($startCoordinates,$endCoordinates){
