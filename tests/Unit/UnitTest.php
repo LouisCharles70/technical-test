@@ -64,16 +64,12 @@ class UnitTest extends TestCase
             $response->assertStatus(200);
 
             $decodedResponse = json_decode($response->getContent());
-            dd($decodedResponse);
 
             $this->assertDatabaseHas("orders",[
                 "id" => $decodedResponse->id,
                 "distance" => $mockedDistance,
                 "status" => "UNASSIGNED"
             ]);
-
-
-
         }
 
         // Test with integers
