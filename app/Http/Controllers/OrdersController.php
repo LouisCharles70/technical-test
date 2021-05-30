@@ -53,6 +53,8 @@ class OrdersController extends Controller
         if(count($validator->messages())>0)
             return CustomHelpers::returnValidationErrors($validator);
 
+
+
         //        Check the distance has been successfully computed from the Google Maps Direction API
         try {
             $distance = Logistic::computeDistance(request('origin'), request('destination'));

@@ -3,9 +3,13 @@
 namespace Tests\Unit;
 
 use App\Order;
+
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 use Faker;
+
+
 
 class UnitTest extends TestCase
 {
@@ -31,31 +35,45 @@ class UnitTest extends TestCase
                 "$faker->longitude"
             ];
 
-//            TODO: MOCK GOOGLE CLOUD FUNCTION API
+//            Mock the HTTP Request sent to Google Directions API
+            $mockedDistance = 2021;
+            Http::fake([
+                'https://maps.googleapis.com/maps/api/directions/*' => Http::response([
+                    "status" => "Loulou",
+                    "routes" => [
+                        0 => [
+                            "legs" => [
+                                0 => [
+                                    "distance" => [
+                                        "value" => $mockedDistance
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ] ,200,['Headers'])
+            ]);
+
             $response = $this
                 ->post(env('APP_URL').'/orders',[
                     "origin" => $origin,
                     "destination" => $destination
                 ]);
 
-//            Google Directions API can not always compute the distance between two points as the random latitude
-//            longitude are often located in the sea, in these cases the distance can not be computed by Google
-//            Directions API
-            if($response->status()!=200)
-                echo $response->content() . "\n";
-
 //            Case where Google Directions API can compute the distance
-            if(!isset(json_decode($response->getContent())->message)){
-                $response->assertStatus(200);
+            $response->assertStatus(200);
 
-                $decodedResponse = json_decode($response->getContent());
+            $decodedResponse = json_decode($response->getContent());
+            dd($decodedResponse);
 
-                $this->assertDatabaseHas("orders",[
-                    "id" => $decodedResponse->id,
-                    "distance" => $decodedResponse->distance,
-                    "status" => "UNASSIGNED"
-                ]);
-            }
+            $this->assertDatabaseHas("orders",[
+                "id" => $decodedResponse->id,
+                "distance" => $mockedDistance,
+                "status" => "UNASSIGNED"
+            ]);
+
+
+
         }
 
         // Test with integers
@@ -166,9 +184,9 @@ class UnitTest extends TestCase
 
         //        Order doesn't exist
         $nonExistingOrderId = DB::table("orders")
-            ->orderBy("id","desc")
-            ->first()
-            ->id+1;
+                ->orderBy("id","desc")
+                ->first()
+                ->id+1;
 
         $response = $this
             ->patch('/orders/'.$nonExistingOrderId,[

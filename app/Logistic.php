@@ -5,7 +5,8 @@ namespace App;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use yidas\googleMaps\Client;
+use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Http;
 
 /**
  * App\Logistic
@@ -18,17 +19,13 @@ use yidas\googleMaps\Client;
 class Logistic extends Model
 {
     public static function computeDistance($startCoordinates,$endCoordinates){
-        try {
-            $gmaps = new Client(['key' => env('GOOGLE_MAPS_API_KEY')]);
-        } catch (\Exception $e) {
-            return "Please check your google maps API credentials";
-        }
+        $directionsResult = Http::get('https://maps.googleapis.com/maps/api/directions/json', [
+                'origin' => "$startCoordinates[0],$startCoordinates[1]",
+                'destination' => "$endCoordinates[0],$endCoordinates[1]",
+                'key' => env('GOOGLE_MAPS_API_KEY')
+            ]);
 
-        $directionsResult = $gmaps->directions("$startCoordinates[0],$startCoordinates[1]", "$endCoordinates[0],$endCoordinates[1]", [
-                'mode' => "transit",
-                'departure_time' => time(),
-            ]
-        );
+        $directionsResult = json_decode($directionsResult,TRUE);
 
         if($directionsResult["status"]=="ZERO_RESULTS")
             throw new \Exception("Unable to compute distance between origin and destination");
